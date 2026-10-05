@@ -1,0 +1,185 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<title>Java版 Tellraw エディタ</title>
+<style>
+  body { font-family: sans-serif; padding: 20px; }
+  .part { border: 1px solid #ccc; padding: 10px; margin: 10px 0; }
+  label { display: block; margin-top: 6px; }
+  textarea, input, select { width: 100%; }
+  code { display: block; white-space: pre-wrap; background: #f4f4f4; padding: 10px; }
+</style>
+</head>
+<body>
+
+<h1>Java版 Tellraw エディタ</h1>
+
+<button onclick="addTextPart()">＋ テキストパーツ追加</button>
+<button onclick="addSelectorPart()">＋ プレイヤー名パーツ追加</button>
+
+<div id="parts"></div>
+
+<h2>プレビュー</h2>
+<div id="preview" style="padding:10px; border:1px solid #ccc; min-height:40px;"></div>
+
+<h2>生成されたコマンド</h2>
+<code id="output"></code>
+<button onclick="copyCmd()">コピー</button>
+
+<script>
+let partId = 0;
+
+function addTextPart() {
+  const id = partId++;
+  const div = document.createElement("div");
+  div.className = "part";
+  div.id = "part_" + id;
+  div.dataset.type = "text";
+
+  div.innerHTML = `
+    <h3>テキストパーツ</h3>
+
+    <label>テキスト</label>
+    <input type="text" id="text_${id}">
+
+    <label>色</label>
+    <select id="color_${id}">
+      <option value="">なし</option>
+      <option value="red">赤</option>
+      <option value="green">緑</option>
+      <option value="blue">青</option>
+      <option value="yellow">黄</option>
+      <option value="white">白</option>
+      <option value="black">黒</option>
+      <option value="gold">金</option>
+      <option value="aqua">水色</option>
+      <option value="light_purple">紫</option>
+    </select>
+
+    <label>太字</label>
+    <input type="checkbox" id="bold_${id}">
+
+    <label>クリックイベント</label>
+    <select id="click_${id}">
+      <option value="">なし</option>
+      <option value="run_command">コマンド実行</option>
+      <option value="open_url">URL を開く</option>
+      <option value="suggest_command">チャットに入力</option>
+    </select>
+    <input type="text" id="click_value_${id}" placeholder="コマンド or URL">
+
+    <label>ホバー（説明文）</label>
+    <input type="text" id="hover_${id}">
+
+    <button onclick="removePart(${id})">削除</button>
+  `;
+
+  document.getElementById("parts").appendChild(div);
+  update();
+}
+
+function addSelectorPart() {
+  const id = partId++;
+  const div = document.createElement("div");
+  div.className = "part";
+  div.id = "part_" + id;
+  div.dataset.type = "selector";
+
+  div.innerHTML = `
+    <h3>プレイヤー名パーツ</h3>
+
+    <label>対象セレクター（例：@p, @s, @a）</label>
+    <input type="text" id="selector_${id}" value="@p">
+
+    <button onclick="removePart(${id})">削除</button>
+  `;
+
+  document.getElementById("parts").appendChild(div);
+  update();
+}
+
+function removePart(id) {
+  document.getElementById("part_" + id).remove();
+  update();
+}
+
+function update() {
+  const parts = document.querySelectorAll(".part");
+  const extra = [];
+  let previewHTML = "";
+
+  parts.forEach(div => {
+    const id = div.id.split("_")[1];
+
+    if (div.dataset.type === "text") {
+      const text = document.getElementById("text_" + id).value;
+      const color = document.getElementById("color_" + id).value;
+      const bold = document.getElementById("bold_" + id).checked;
+      const click = document.getElementById("click_" + id).value;
+      let clickValue = document.getElementById("click_value_" + id).value;
+      const hover = document.getElementById("hover_" + id).value;
+
+      const obj = { text };
+
+      if (color) obj.color = color;
+      if (bold) obj.bold = true;
+
+      if (hover) {
+        obj.hoverEvent = {
+          action: "show_text",
+          value: hover
+        };
+      }
+
+      if (click && clickValue) {
+        // Java版は run_command の value に / が必要
+        if (click === "run_command" && !clickValue.startsWith("/")) {
+          clickValue = "/" + clickValue;
+        }
+
+        obj.clickEvent = {
+          action: click,
+          value: clickValue
+        };
+      }
+
+      extra.push(obj);
+
+      previewHTML += `<span style="color:${color || "inherit"}; font-weight:${bold ? "bold" : "normal"}" title="${hover}">${text}</span>`;
+      return;
+    }
+
+    if (div.dataset.type === "selector") {
+      const sel = document.getElementById("selector_" + id).value;
+
+      extra.push({
+        text: "",
+        selector: sel
+      });
+
+      previewHTML += `<span style="color:cyan">${sel}</span>`;
+      return;
+    }
+  });
+
+  const base = {
+    text: "",
+    extra: extra
+  };
+
+  const cmd = `/tellraw @a ${JSON.stringify(base)}`;
+  document.getElementById("output").textContent = cmd;
+  document.getElementById("preview").innerHTML = previewHTML;
+}
+
+document.addEventListener("input", update);
+
+function copyCmd() {
+  navigator.clipboard.writeText(document.getElementById("output").textContent);
+  alert("コピーしました");
+}
+</script>
+
+</body>
+</html>

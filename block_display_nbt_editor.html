@@ -1,0 +1,153 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<title>Block Display NBT エディタ（テクスチャ付き）</title>
+<style>
+  body { font-family: sans-serif; padding: 20px; display: flex; gap: 20px; }
+  #ui { width: 380px; }
+  label { display: block; margin-top: 10px; }
+  input, select { width: 100%; padding: 5px; }
+  code { display: block; white-space: pre-wrap; background: #f4f4f4; padding: 10px; }
+  #preview { width: 420px; height: 420px; border: 1px solid #ccc; }
+</style>
+</head>
+<body>
+
+<div id="ui">
+<h1>Block Display NBT エディタ</h1>
+
+<h2>ブロック</h2>
+<select id="blockSelect">
+  <option value="minecraft:stone">石</option>
+  <option value="minecraft:dirt">土</option>
+  <option value="minecraft:oak_planks">オークの板材</option>
+  <option value="minecraft:glass">ガラス</option>
+  <option value="minecraft:diamond_block">ダイヤブロック</option>
+</select>
+
+<h2>大きさ（スケール）</h2>
+<label>X</label>
+<input type="range" id="scaleX" min="0.1" max="5" step="0.1" value="1">
+<span id="scaleX_val">1</span>
+
+<label>Y</label>
+<input type="range" id="scaleY" min="0.1" max="5" step="0.1" value="1">
+<span id="scaleY_val">1</span>
+
+<label>Z</label>
+<input type="range" id="scaleZ" min="0.1" max="5" step="0.1" value="1">
+<span id="scaleZ_val">1</span>
+
+<h2>brightness</h2>
+<input id="brightness" value="{block:15,sky:15}">
+
+<h2>座標</h2>
+<input id="x" value="~">
+<input id="y" value="~">
+<input id="z" value="~">
+
+<h2>NBT</h2>
+<code id="nbtOutput"></code>
+
+<h2>/summon コマンド</h2>
+<code id="cmdOutput"></code>
+<button onclick="copyCmd()">コピー</button>
+</div>
+
+<div id="preview"></div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+
+<script>
+// ブロック名 → テクスチャパス
+const BLOCK_TEXTURES = {
+  "minecraft:stone": "textures/stone.png",
+  "minecraft:dirt": "textures/dirt.png",
+  "minecraft:oak_planks": "textures/oak_planks.png",
+  "minecraft:glass": "textures/glass.png",
+  "minecraft:diamond_block": "textures/diamond_block.png"
+};
+
+// ======== 3D PREVIEW SETUP ========
+const scene = new THREE.Scene();
+const camera = new THREE.PerspectiveCamera(70, 1, 0.1, 100);
+camera.position.set(3, 3, 3);
+camera.lookAt(0, 0, 0);
+
+const renderer = new THREE.WebGLRenderer({ antialias: true });
+renderer.setSize(420, 420);
+document.getElementById("preview").appendChild(renderer.domElement);
+
+scene.add(new THREE.AmbientLight(0x777777));
+const light = new THREE.DirectionalLight(0xffffff, 1);
+light.position.set(3, 5, 2);
+scene.add(light);
+
+const cubeGeo = new THREE.BoxGeometry(1, 1, 1);
+let cubeMat = new THREE.MeshStandardMaterial({ color: 0xaaaaaa });
+const cube = new THREE.Mesh(cubeGeo, cubeMat);
+scene.add(cube);
+
+const texLoader = new THREE.TextureLoader();
+
+function setBlockTexture(blockName) {
+  const path = BLOCK_TEXTURES[blockName];
+  if (!path) {
+    cube.material = new THREE.MeshStandardMaterial({ color: 0xaaaaaa });
+    return;
+  }
+  texLoader.load(path, tex => {
+    tex.magFilter = THREE.NearestFilter;
+    tex.minFilter = THREE.NearestMipMapNearestFilter;
+    cube.material = new THREE.MeshStandardMaterial({ map: tex });
+  });
+}
+
+function animate() {
+  requestAnimationFrame(animate);
+  cube.rotation.y += 0.01;
+  renderer.render(scene, camera);
+}
+animate();
+
+// ======== UI LOGIC ========
+function update() {
+  const block = document.getElementById("blockSelect").value;
+
+  const sx = parseFloat(document.getElementById("scaleX").value);
+  const sy = parseFloat(document.getElementById("scaleY").value);
+  const sz = parseFloat(document.getElementById("scaleZ").value);
+
+  document.getElementById("scaleX_val").textContent = sx;
+  document.getElementById("scaleY_val").textContent = sy;
+  document.getElementById("scaleZ_val").textContent = sz;
+
+  cube.scale.set(sx, sy, sz);
+  setBlockTexture(block);
+
+  const brightness = document.getElementById("brightness").value;
+  const x = document.getElementById("x").value;
+  const y = document.getElementById("y").value;
+  const z = document.getElementById("z").value;
+
+  const transform = `[${sx}f,0f,0f,0f, 0f,${sy}f,0f,0f, 0f,0f,${sz}f,0f, 0f,0f,0f,1f]`;
+
+  const nbt = `{block_state:{Name:"${block}"},transformation:${transform},brightness:${brightness}}`;
+  document.getElementById("nbtOutput").textContent = nbt;
+
+  const cmd = `/summon block_display ${x} ${y} ${z} ${nbt}`;
+  document.getElementById("cmdOutput").textContent = cmd;
+}
+
+document.addEventListener("input", update);
+update();
+
+function copyCmd() {
+  navigator.clipboard.writeText(document.getElementById("cmdOutput").textContent);
+  alert("コピーしました");
+}
+</script>
+
+</body>
+</html>
